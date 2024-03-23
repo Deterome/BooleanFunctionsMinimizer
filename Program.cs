@@ -49,13 +49,60 @@ namespace MLITA {
             return binaryNumbersList;
         }
 
+        static void MakeImplicantTable(List<string> primeImplicants, List<string> constituentsOfOne) {
+            List<List<bool>> tableMatrix = new();
+            int bitsPerNum = constituentsOfOne[0].Length;
+
+            for (int primeImpId = 0; primeImpId < primeImplicants.Count; primeImpId++) {
+                tableMatrix.Add(new List<bool>());
+                for (int constitOfOneId = 0; constitOfOneId < constituentsOfOne.Count; constitOfOneId++) {
+                    bool isConstituentCovered = true;
+                    for (int bitId = 0; bitId < bitsPerNum; bitId++) {
+                        if (primeImplicants[primeImpId][bitId] == MERGED_BITS_SYMBOL) {
+                            continue;
+                        } else if (primeImplicants[primeImpId][bitId] != constituentsOfOne[constitOfOneId][bitId]){
+                            isConstituentCovered = false;
+                        }
+                    }
+                    tableMatrix[primeImpId].Add(isConstituentCovered);
+                }
+            }
+
+
+            const char ROW_SYMBOL = '_';
+            const char COL_SYMBOL = '|';
+            const char COVERED_CONSTITUENT_SYMBOL = '+';
+            const char UNCOVERED_CONSTITUENT_SYMBOL = ROW_SYMBOL;
+            int spaceArountCell = 1;
+            Console.WriteLine();
+            Console.Write(new string(ROW_SYMBOL, bitsPerNum + spaceArountCell*2) + COL_SYMBOL);
+            foreach (var constituent in constituentsOfOne) {
+                Console.Write(new String(ROW_SYMBOL, spaceArountCell) + constituent + new String(ROW_SYMBOL, spaceArountCell) + COL_SYMBOL);
+            }
+            Console.WriteLine();
+            int row = 0, col = 0;
+            foreach (var implicant in primeImplicants) {
+                Console.Write(new String(ROW_SYMBOL, spaceArountCell) + implicant + new String(ROW_SYMBOL, spaceArountCell) + COL_SYMBOL);
+                while (col < tableMatrix[row].Count) {
+                    Console.Write(new String(ROW_SYMBOL, spaceArountCell + (int)Math.Ceiling((Convert.ToDouble(bitsPerNum)-1)/2)));
+                    if (tableMatrix[row][col]) {
+                        Console.Write(COVERED_CONSTITUENT_SYMBOL);
+                    } else {
+                        Console.Write(UNCOVERED_CONSTITUENT_SYMBOL);
+                    }
+                    Console.Write(new String(ROW_SYMBOL, spaceArountCell + (int)Math.Floor((Convert.ToDouble(bitsPerNum)-1)/2)) + COL_SYMBOL);
+                    col++;
+                }
+                Console.WriteLine();
+                col = 0;
+                row++;
+            }
+        }
+
         static void FindMinDNF(List<int> decConstituentsOfOnes) {
             var binConstituentsOfOnes = ConvertNumbersFromDecToBin(decConstituentsOfOnes, out _);
-            Console.WriteLine();
-            OutputListInConsole(binConstituentsOfOnes);
-            Console.WriteLine();
             var PrimeImplicants = GetPrimeImplicants(binConstituentsOfOnes);
-            OutputListInConsole(PrimeImplicants);
+            MakeImplicantTable(PrimeImplicants, binConstituentsOfOnes);
             // 3) Производим попарное сравнение элементов соседних групп, при этом помечаем те 
             //    бинарные числа, которые нашли свою пару
             // 4) С помощью метода Петрика находим тупиковую ДНФ
