@@ -13,7 +13,7 @@ namespace MLITA {
     class MLITA_LAB2 {
 
         static void Main(string[] args) {
-            Console.WriteLine("Enter list of numbers of unit sets of a Boolean function:");
+            Console.WriteLine("Enter a Boolean function using dec numbers:");
             
             var numbersString = String.Empty;
             while (numbersString == string.Empty) {
