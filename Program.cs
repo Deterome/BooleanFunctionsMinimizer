@@ -2,6 +2,7 @@
 using System.Diagnostics.Tracing;
 using System.Dynamic;
 using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
 using System.Text.RegularExpressions;
 using NewCollections.MultiValueDictionary;
 using NewValues.MarkableValue;
@@ -18,33 +19,83 @@ namespace MLITA {
             while (numbersString == string.Empty) {
             numbersString = Console.ReadLine();
             }
-
+            
             FindMinDNF(MakeNumbersListFromString(numbersString));
         }
 
          static void FindMinDNF(List<int> decConstituentsOfOnes) {
-            var binConstituentsOfOnes = ConvertNumbersFromDecToBin(decConstituentsOfOnes, out _);
+            if (decConstituentsOfOnes.Count == 0) {
+                Console.WriteLine("There is no numbers!");
+                return;
+            }
+
+            var binConstituentsOfOnes = GetBinConstituentsFromDec(decConstituentsOfOnes);
             var primeImplicants = GetPrimeImplicants(binConstituentsOfOnes);
             var implicantTable = MakeImplicantTable(primeImplicants, binConstituentsOfOnes);
             Console.WriteLine();
             DrawImplicantTable(implicantTable, true);
             Console.WriteLine();
-            var CNF = MakeCNFFromImplicantTable(implicantTable);
+            var CNF = MakeMinCNFFromImplicantTable(implicantTable);
+            Console.WriteLine($"CNF: {CNF}");
+            Console.WriteLine();
+
+            var cnfList = CNF.Split(MlitaSymbols.DISJUNCTION_SYMBOL).ToList();
+            var minCNFOperand = string.Empty;
+            int minCNFLength = 0;
+            foreach (var cnfOperand in cnfList) {
+                if (minCNFOperand == string.Empty || cnfOperand.Length < minCNFLength) {
+                    minCNFOperand = cnfOperand;
+                    minCNFLength = cnfOperand.Length;
+                }
+            }
+            Console.WriteLine($"Picked operand from CNF: {minCNFOperand}");
+            Console.WriteLine();
+            var minDNF = MakeDNFFromCNF(minCNFOperand, primeImplicants);
+            Console.WriteLine($"minDNF: {minDNF}");
         }
 
-        static string MinimizeCNF(string CNF) {
-            string minCNF = string.Empty;
-            
-            return minCNF;
+        static List<string> GetBinConstituentsFromDec(List<int> decConstituents) {
+            for (int firstElementId = 0; firstElementId < decConstituents.Count - 1; firstElementId++) {
+                for (int secondElementId = firstElementId + 1; secondElementId < decConstituents.Count; secondElementId++) {
+                    if (decConstituents[firstElementId] == decConstituents[secondElementId]) {
+                        decConstituents.RemoveAt(secondElementId--);
+                    }
+                }
+            }
+            var binConstituents = ConvertNumbersFromDecToBin(decConstituents, out _);
+            return binConstituents;
         }
 
-        static string MakeCNFFromImplicantTable(Dictionary<string, Dictionary<string, bool>> implicantTable) {
+        static string MakeDNFFromCNF(string CNF, List<string> primeImplicants) {
+            string DNF = string.Empty;
+            foreach (var cnfVariable in CNF) {
+                if (DNF != string.Empty) {
+                    DNF += MlitaSymbols.DISJUNCTION_SYMBOL;
+                }
+                var variableImplicant = primeImplicants[(int)cnfVariable - (int)MlitaSymbols.BEGIN_OF_IMPLICANTS_NAME_ALPHABET];
+                int currentImplicantVariableId = 0;
+                foreach (var implicantBit in variableImplicant) {
+                    if (implicantBit != MlitaSymbols.MERGED_BITS_SYMBOL) {
+                        DNF += MlitaSymbols.DNF_VARIABLE_SYMBOL;
+                        if (implicantBit == MlitaSymbols.BIT_ZERO_SYMBOL) {
+                            DNF += MlitaSymbols.INVERSE_SYMBOL;
+                        }
+                        DNF += MlitaSymbols.GetLowerIndex(currentImplicantVariableId);
+                    }
+                    currentImplicantVariableId++;
+                }
+            }
+
+            return DNF;
+        }
+
+        static string MakeMinCNFFromImplicantTable(Dictionary<string, Dictionary<string, bool>> implicantTable) {
             var implicants = implicantTable.Keys.ToList();
             var constituents = implicantTable[implicants[0]].Keys.ToList();
             Dictionary<char, Dictionary<string, bool>> namedImplicantTable = new();
 
             List<char> namedImplicantTableKeys = new();
-            char variableChar = 'a';
+            char variableChar = MlitaSymbols.BEGIN_OF_IMPLICANTS_NAME_ALPHABET;
             foreach (var implicant in implicants) {
                 namedImplicantTable.Add(variableChar, new());
                 namedImplicantTableKeys.Add(variableChar);
@@ -53,30 +104,81 @@ namespace MLITA {
                 }
                 variableChar++;
             }
+            
+            List<List<string>> conjunctions = new ();
+            foreach (var constituent in constituents) {
+                List<string> disjunctionsList = new();
+                foreach (var variable in namedImplicantTableKeys) {
+                    if (namedImplicantTable[variable][constituent]) {
+                        disjunctionsList.Add(new string(variable, 1));
+                    }
+                }
+                conjunctions.Add(disjunctionsList);
+            }
+
+            
+            while (conjunctions.Count > 1) {
+                var leftOperand = conjunctions[0];
+                var rightOperand = conjunctions[1];
+                var operandsConjuction = new List<string>();
+                // умножение
+                foreach (var leftOperandElement in leftOperand) {
+                    foreach (var rightOperandElement in rightOperand) {
+                        operandsConjuction.Add(leftOperandElement + rightOperandElement);
+                    }
+                }
+                // сокращение 
+
+                // убираем из каждого элемента повторяющиеся переменные
+                for (int conjuctionElementId = 0; conjuctionElementId < operandsConjuction.Count; conjuctionElementId++) {
+                    string minimizedElement = string.Empty;
+                    foreach (var variable in operandsConjuction[conjuctionElementId]) {
+                        if (!minimizedElement.Contains(variable)) {
+                            minimizedElement += variable;
+                        }
+                    }
+                    operandsConjuction[conjuctionElementId] = minimizedElement;
+                }
+                
+                for (int firstConjuctionElementId = 0; firstConjuctionElementId < operandsConjuction.Count - 1; firstConjuctionElementId++) {
+                    for (int secondConjuctionElementId = firstConjuctionElementId + 1; secondConjuctionElementId < operandsConjuction.Count; secondConjuctionElementId++) {
+                        int smallerElementId, biggerElementId;
+                        if (operandsConjuction[firstConjuctionElementId].Length < operandsConjuction[secondConjuctionElementId].Length) {
+                            smallerElementId = firstConjuctionElementId;
+                            biggerElementId = secondConjuctionElementId;
+                        } else if (operandsConjuction[firstConjuctionElementId].Length > operandsConjuction[secondConjuctionElementId].Length) {
+                            smallerElementId = secondConjuctionElementId;
+                            biggerElementId = firstConjuctionElementId;
+                        } else {
+                            if (operandsConjuction[firstConjuctionElementId] == operandsConjuction[secondConjuctionElementId]) {
+                                operandsConjuction.RemoveAt(secondConjuctionElementId--);
+                            }
+                            continue;
+                        }
+
+                        int matchesCount = 0;
+                        foreach (var operandVariable in operandsConjuction[biggerElementId]) {
+                            if (operandsConjuction[smallerElementId].Contains(operandVariable)) {
+                                matchesCount++;
+                            }
+                        }
+                        if (matchesCount == operandsConjuction[smallerElementId].Length) {
+                            operandsConjuction.RemoveAt(biggerElementId);
+                            secondConjuctionElementId--;
+                        }
+                    }
+                }
+
+                conjunctions[0] = operandsConjuction;
+                conjunctions.RemoveAt(1);
+            }
 
             string CNF = string.Empty;
-            foreach (var constituent in constituents) {
+            foreach (var operand in conjunctions[0]) {
                 if (CNF != string.Empty) {
                     CNF += MlitaSymbols.DISJUNCTION_SYMBOL;
                 }
-                List<char> operandsList = new();
-                foreach (var variable in namedImplicantTableKeys) {
-                    if (namedImplicantTable[variable][constituent]) {
-                        operandsList.Add(variable);
-                    }
-                }
-                if (operandsList.Count == 1) {
-                    CNF += operandsList[0];
-                } else if (operandsList.Count > 1) {
-                    CNF += MlitaSymbols.OPENING_PARENTHESIS_SYMBOL;
-                    for (int operandId = 0; operandId < operandsList.Count; operandId++)  {
-                        CNF += operandsList[operandId];
-                        if (operandId != operandsList.Count - 1) {
-                            CNF += MlitaSymbols.CONJUNCTION_SYMBOL;
-                        }
-                    }
-                    CNF += MlitaSymbols.CLOSING_PARENTHESIS_SYMBOL;
-                }
+                CNF += operand;
             }
 
             return CNF;
@@ -122,7 +224,7 @@ namespace MLITA {
             }
             Console.WriteLine();
             int row = 0, col = 0;
-            char currentImplicantName = 'a';
+            char currentImplicantName = MlitaSymbols.BEGIN_OF_IMPLICANTS_NAME_ALPHABET;
             foreach (var implicant in primeImplicants) {
                 Console.Write(new String(MlitaSymbols.ROW_SYMBOL, spaceArountCell) + implicant + new String(MlitaSymbols.ROW_SYMBOL, spaceArountCell) + MlitaSymbols.COL_SYMBOL);
                 foreach(var constituent in constituentsOfOne) {
