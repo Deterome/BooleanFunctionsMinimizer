@@ -35,23 +35,23 @@ namespace MLITA {
             Console.WriteLine();
             DrawImplicantTable(implicantTable, true);
             Console.WriteLine();
-            var CNF = MakeMinCNFFromImplicantTable(implicantTable);
-            Console.WriteLine($"CNF: {CNF}");
+            var DNF = MakeDNFFromImplicantTable(implicantTable);
+            Console.WriteLine($"DNF: {DNF}");
             Console.WriteLine();
 
-            var cnfList = CNF.Split(MlitaSymbols.DISJUNCTION_SYMBOL).ToList();
-            var minCNFOperand = string.Empty;
-            int minCNFLength = 0;
-            foreach (var cnfOperand in cnfList) {
-                if (minCNFOperand == string.Empty || cnfOperand.Length < minCNFLength) {
-                    minCNFOperand = cnfOperand;
-                    minCNFLength = cnfOperand.Length;
+            var minDNFList = DNF.Split(MlitaSymbols.DISJUNCTION_SYMBOL).ToList();
+            var minDNF = string.Empty;
+            int minDNFLength = 0;
+            foreach (var dnfOperand in minDNFList) {
+                if (minDNF == string.Empty || dnfOperand.Length < minDNFLength) {
+                    minDNF = dnfOperand;
+                    minDNFLength = dnfOperand.Length;
                 }
             }
-            Console.WriteLine($"Picked operand from CNF: {minCNFOperand}");
+            Console.WriteLine($"Picked minDNF: {minDNF}");
             Console.WriteLine();
-            var minDNF = MakeDNFFromCNF(minCNFOperand, primeImplicants);
-            Console.WriteLine($"minDNF: {minDNF}");
+            var expandedMinDNF = ExpandDNF(minDNF, primeImplicants);
+            Console.WriteLine($"Expanded minDNF: {expandedMinDNF}");
         }
 
         static List<string> GetBinConstituentsFromDec(List<int> decConstituents) {
@@ -66,30 +66,30 @@ namespace MLITA {
             return binConstituents;
         }
 
-        static string MakeDNFFromCNF(string CNF, List<string> primeImplicants) {
-            string DNF = string.Empty;
-            foreach (var cnfVariable in CNF) {
-                if (DNF != string.Empty) {
-                    DNF += MlitaSymbols.DISJUNCTION_SYMBOL;
+        static string ExpandDNF(string DNF, List<string> primeImplicants) {
+            string expandedDNF = string.Empty;
+            foreach (var dnfVariable in DNF) {
+                if (expandedDNF != string.Empty) {
+                    expandedDNF += MlitaSymbols.DISJUNCTION_SYMBOL;
                 }
-                var variableImplicant = primeImplicants[(int)cnfVariable - (int)MlitaSymbols.BEGIN_OF_IMPLICANTS_NAME_ALPHABET];
+                var variableImplicant = primeImplicants[(int)dnfVariable - (int)MlitaSymbols.BEGIN_OF_IMPLICANTS_NAME_ALPHABET];
                 int currentImplicantVariableId = 0;
                 foreach (var implicantBit in variableImplicant) {
                     if (implicantBit != MlitaSymbols.MERGED_BITS_SYMBOL) {
-                        DNF += MlitaSymbols.DNF_VARIABLE_SYMBOL;
+                        expandedDNF += MlitaSymbols.DNF_VARIABLE_SYMBOL;
                         if (implicantBit == MlitaSymbols.BIT_ZERO_SYMBOL) {
-                            DNF += MlitaSymbols.INVERSE_SYMBOL;
+                            expandedDNF += MlitaSymbols.INVERSE_SYMBOL;
                         }
-                        DNF += MlitaSymbols.GetLowerIndex(currentImplicantVariableId);
+                        expandedDNF += MlitaSymbols.GetLowerIndex(currentImplicantVariableId);
                     }
                     currentImplicantVariableId++;
                 }
             }
 
-            return DNF;
+            return expandedDNF;
         }
 
-        static string MakeMinCNFFromImplicantTable(Dictionary<string, Dictionary<string, bool>> implicantTable) {
+        static string MakeDNFFromImplicantTable(Dictionary<string, Dictionary<string, bool>> implicantTable) {
             var implicants = implicantTable.Keys.ToList();
             var constituents = implicantTable[implicants[0]].Keys.ToList();
             Dictionary<char, Dictionary<string, bool>> namedImplicantTable = new();
@@ -173,15 +173,15 @@ namespace MLITA {
                 conjunctions.RemoveAt(1);
             }
 
-            string CNF = string.Empty;
+            string DNF = string.Empty;
             foreach (var operand in conjunctions[0]) {
-                if (CNF != string.Empty) {
-                    CNF += MlitaSymbols.DISJUNCTION_SYMBOL;
+                if (DNF != string.Empty) {
+                    DNF += MlitaSymbols.DISJUNCTION_SYMBOL;
                 }
-                CNF += operand;
+                DNF += operand;
             }
 
-            return CNF;
+            return DNF;
         }
 
         static List<int> MakeNumbersListFromString(string numbersString) {
